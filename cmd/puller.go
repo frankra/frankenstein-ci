@@ -1,18 +1,13 @@
 package main
 
 import (
-	"archive/tar"
-	"compress/gzip"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/frankra/frankenstein-ci/pkg/host"
-	"golang.org/x/sync/errgroup"
+	"github.com/frankra/frankenstein-ci/pkg/rest"
 )
 
 type Layer struct {
@@ -43,14 +38,18 @@ type AuthResponse struct {
 }
 
 func main() {
+	if len(os.Args) < 2 && os.Args[1] == "" {
+		panic("command requires an image name as argument")
+	}
 	imageName := os.Args[1]
-	client := http.Client{}
 
-	auth, err := getAuth(client, imageName)
+	ctx := context.Background()
+
+	auth, err := getAuth(ctx, imageName)
 	if err != nil {
 		panic(fmt.Sprintf("failed to auth, %s", err.Error()))
 	}
-	manifests, err := getManifests(client, auth, imageName)
+	manifests, err := getManifests(ctx, auth, imageName)
 	if err != nil {
 		panic(fmt.Sprintf("failed to fetch manifests, %s", err.Error()))
 	}
@@ -60,12 +59,14 @@ func main() {
 		panic(err)
 	}
 
-	manifest, err := getManifest(client, auth, imageName, manifestMetadata)
+	manifest, err := getManifest(ctx, auth, imageName, manifestMetadata)
 	if err != nil {
 		panic(err)
 	}
 
-	downloadLayers(client, auth, imageName, manifest.Layers)
+	fmt.Print(manifest)
+
+	// processLayers(client, auth, imageName, manifest.Layers)
 }
 
 func findManifestForCurrentArch(resp ManifestsResponse) (ManifestMetadata, error) {
@@ -79,196 +80,163 @@ func findManifestForCurrentArch(resp ManifestsResponse) (ManifestMetadata, error
 	return ManifestMetadata{}, fmt.Errorf("could not find a manifest for arch %s", hostArch)
 }
 
-func getAuth(client http.Client, imageName string) (AuthResponse, error) {
-	auth := AuthResponse{}
+func getAuth(ctx context.Context, imageName string) (AuthResponse, error) {
 	authUrl := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/%s:pull", imageName)
-	res, err := client.Get(authUrl)
-	if err != nil {
-		return auth, fmt.Errorf("failed to authenticate, %w", err)
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return auth, fmt.Errorf("failed to read the body, %w", err)
-	}
 
-	err = json.Unmarshal(body, &auth)
+	client := rest.NewReadClient[AuthResponse]()
+	auth, err := client.GetJSON(
+		ctx,
+		authUrl,
+		nil,
+	)
 	if err != nil {
-		return auth, fmt.Errorf("failed to unmarshal the body as object, %w", err)
+		return AuthResponse{}, fmt.Errorf("failed to get auth token, %w", err)
 	}
-
-	return auth, err
+	return *auth, nil
 }
 
-func getManifests(client http.Client, auth AuthResponse, imageName string) (ManifestsResponse, error) {
-	manifest := ManifestsResponse{}
+func getManifests(ctx context.Context, auth AuthResponse, imageName string) (ManifestsResponse, error) {
 	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/manifests/latest", imageName)
+	client := rest.NewReadClient[ManifestsResponse]()
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to create request, %w", err)
-	}
-	req.Header.Add("Authorization", "Bearer "+auth.AccessToken)
-	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-
-	res, err := client.Do(req)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to get the manifests, %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to read the body, %w", err)
+	headers := map[string]string{
+		"Authorization": "Bearer " + auth.AccessToken,
+		"Accept":        "application/vnd.docker.distribution.manifest.v2+json",
 	}
 
-	err = json.Unmarshal(body, &manifest)
+	res, err := client.GetJSON(ctx, url, headers)
 	if err != nil {
-		return manifest, fmt.Errorf("failed to unmarshal the body as object, %w", err)
+		return ManifestsResponse{}, fmt.Errorf("failed to get manifests for image %s, %w", imageName, err)
 	}
-
-	return manifest, err
+	return *res, err
 }
 
-func getManifest(client http.Client, auth AuthResponse, imageName string, metadata ManifestMetadata) (Manifest, error) {
-	manifest := Manifest{}
+func getManifest(ctx context.Context, auth AuthResponse, imageName string, metadata ManifestMetadata) (Manifest, error) {
 	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, metadata.Digest)
+	client := rest.NewReadClient[Manifest]()
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to create request, %w", err)
-	}
-	req.Header.Add("Authorization", "Bearer "+auth.AccessToken)
-	req.Header.Add("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-
-	res, err := client.Do(req)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to get the manifest, %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return manifest, fmt.Errorf("failed to read the body, %w", err)
+	headers := map[string]string{
+		"Authorization": "Bearer " + auth.AccessToken,
+		"Accept":        "application/vnd.docker.distribution.manifest.v2+json",
 	}
 
-	err = json.Unmarshal(body, &manifest)
+	res, err := client.GetJSON(ctx, url, headers)
 	if err != nil {
-		return manifest, fmt.Errorf("failed to unmarshal the body as object, %w", err)
+		return Manifest{}, fmt.Errorf("failed to get manifest for image %s, %w", imageName, err)
 	}
-
-	return manifest, err
+	return *res, err
 }
 
-func downloadLayers(client http.Client, auth AuthResponse, imageName string, layers []Layer) error {
-	extractDir := fmt.Sprintf("./images/%s", imageName)
-	err := os.MkdirAll(extractDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create %s dir: %w", imageName, err)
-	}
+// func processLayers(client http.Client, auth AuthResponse, imageName string, layers []Layer) error {
+// 	extractDir := fmt.Sprintf("./images/%s", imageName)
+// 	err := os.MkdirAll(extractDir, 0755)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create %s dir: %w", imageName, err)
+// 	}
 
-	g := errgroup.Group{}
-	for _, layer := range layers {
-		g.Go(func() error {
-			return pipeGzip(
-				client,
-				auth,
-				imageName,
-				layer,
-				extractDir,
-			)
-		})
-	}
+// 	g := errgroup.Group{}
+// 	for _, layer := range layers {
+// 		g.Go(func() error {
+// 			return pipeGzip(
+// 				client,
+// 				auth,
+// 				imageName,
+// 				layer,
+// 				extractDir,
+// 			)
+// 		})
+// 	}
 
-	err = g.Wait()
-	if err != nil {
+// 	err = g.Wait()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to download layers, %w", err)
+// 	}
 
-	}
+// 	return nil
+// }
 
-	return nil
-}
+// func pipeGzip(
+// 	client http.Client,
+// 	auth AuthResponse,
+// 	imageName string,
+// 	layer Layer,
+// 	extractDir string,
+// ) error {
+// 	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, layer.Digest)
 
-func pipeGzip(
-	client http.Client,
-	auth AuthResponse,
-	imageName string,
-	layer Layer,
-	extractDir string,
-) error {
-	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, layer.Digest)
+// 	req, err := http.NewRequest("GET", url, nil)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create request: %w", err)
+// 	}
+// 	req.Header.Set("Authorization", "Bearer "+auth.Token)
+// 	req.Header.Set("Accept", layer.MediaType)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+auth.Token)
-	req.Header.Set("Accept", layer.MediaType)
+// 	res, err := client.Do(req)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to download layer %s: %w", layer.Digest, err)
+// 	}
+// 	defer res.Body.Close()
 
-	res, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to download layer %s: %w", layer.Digest, err)
-	}
-	defer res.Body.Close()
-	// Defer closing the body inside the loop via an anonymous function
-	// to avoid leaking file descriptors if we parallelize later.
+// 	if res.StatusCode != http.StatusOK {
+// 		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+// 	}
 
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
-	}
+// }
 
-	gzf, err := gzip.NewReader(res.Body)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzf.Close()
+// func unzipLayer() {
+// 	gzf, err := gzip.NewReader(res.Body)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create gzip reader: %w", err)
+// 	}
+// 	defer gzf.Close()
 
-	tarReader := tar.NewReader(gzf)
+// 	tarReader := tar.NewReader(gzf)
 
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break // End of this layer's archive
-		}
-		if err != nil {
-			return fmt.Errorf("tar reader error: %w", err)
-		}
+// 	for {
+// 		header, err := tarReader.Next()
+// 		if err == io.EOF {
+// 			break // End of this layer's archive
+// 		}
+// 		if err != nil {
+// 			return fmt.Errorf("tar reader error: %w", err)
+// 		}
 
-		targetPath := filepath.Join(extractDir, header.Name)
+// 		targetPath := filepath.Join(extractDir, header.Name)
 
-		// Some tarballs omit explicit directory entries, so we ensure the parent exists
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return fmt.Errorf("failed to create parent dir: %w", err)
-		}
+// 		// Some tarballs omit explicit directory entries, so we ensure the parent exists
+// 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+// 			return fmt.Errorf("failed to create parent dir: %w", err)
+// 		}
 
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-		case tar.TypeReg:
-			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
-			if err != nil {
-				return fmt.Errorf("failed to create file: %w", err)
-			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
-				return fmt.Errorf("failed to extract file: %w", err)
-			}
-			outFile.Close()
-		case tar.TypeSymlink:
-			// If a symlink already exists from a previous layer, remove it
-			os.Remove(targetPath)
-			if err := os.Symlink(header.Linkname, targetPath); err != nil {
-				return fmt.Errorf("failed to create symlink: %w", err)
-			}
-		case tar.TypeLink:
-			os.Remove(targetPath)
-			// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
-			linkTarget := filepath.Join(extractDir, header.Linkname)
-			if err := os.Link(linkTarget, targetPath); err != nil {
-				return fmt.Errorf("failed to create hardlink: %w", err)
-			}
-		}
-	}
-	return nil
-}
+// 		switch header.Typeflag {
+// 		case tar.TypeDir:
+// 			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+// 				return fmt.Errorf("failed to create directory: %w", err)
+// 			}
+// 		case tar.TypeReg:
+// 			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+// 			if err != nil {
+// 				return fmt.Errorf("failed to create file: %w", err)
+// 			}
+// 			if _, err := io.Copy(outFile, tarReader); err != nil {
+// 				outFile.Close()
+// 				return fmt.Errorf("failed to extract file: %w", err)
+// 			}
+// 			outFile.Close()
+// 		case tar.TypeSymlink:
+// 			// If a symlink already exists from a previous layer, remove it
+// 			os.Remove(targetPath)
+// 			if err := os.Symlink(header.Linkname, targetPath); err != nil {
+// 				return fmt.Errorf("failed to create symlink: %w", err)
+// 			}
+// 		case tar.TypeLink:
+// 			os.Remove(targetPath)
+// 			// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
+// 			linkTarget := filepath.Join(extractDir, header.Linkname)
+// 			if err := os.Link(linkTarget, targetPath); err != nil {
+// 				return fmt.Errorf("failed to create hardlink: %w", err)
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
