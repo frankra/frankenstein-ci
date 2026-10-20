@@ -1,0 +1,22 @@
+README.md
+  h_679603e22ee0c9 3-55
+bruno/opencollection.yml
+  h_679603e22ee0c9 1-10
+pkg/host/arch.go
+  h_679603e22ee0c9 1-36
+pkg/client/client.go
+  h_679603e22ee0c9 1
+cmd/puller.go
+  h_679603e22ee0c9 1-254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "9e7f1859581d74e0bc39e9f4742a7d199fb7e0ab",
+  "prompts": {},
+  "humans": {
+    "h_679603e22ee0c9": {
+      "author": "Rafael Frank <rafael.frank@deliveryhero.com>"
+    }
+  }
+}
