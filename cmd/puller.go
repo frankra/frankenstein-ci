@@ -42,7 +42,7 @@ type AuthResponse struct {
 }
 
 func main() {
-	imageName := "alpine" //TODO: make param
+	imageName := os.Args[1]
 	client := http.Client{}
 
 	auth, err := getAuth(client, imageName)
@@ -160,9 +160,9 @@ func getManifest(client http.Client, auth AuthResponse, imageName string, metada
 }
 
 func downloadLayers(client http.Client, auth AuthResponse, imageName string, layers []Layer) error {
-	extractDir := "./rootfs"
+	extractDir := fmt.Sprintf("./images/%s", imageName)
 	if err := os.MkdirAll(extractDir, 0755); err != nil {
-		return fmt.Errorf("failed to create rootfs dir: %w", err)
+		return fmt.Errorf("failed to create %s dir: %w", imageName, err)
 	}
 
 	for _, layer := range layers {
