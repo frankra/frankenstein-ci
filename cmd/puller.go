@@ -177,7 +177,7 @@ func downloadLayers(client http.Client, auth AuthResponse, imageName string, lay
 
 		res, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("failed to download layer %s: %w", layer, err)
+			return fmt.Errorf("failed to download layer %s: %w", layer.Digest, err)
 		}
 
 		// Defer closing the body inside the loop via an anonymous function
