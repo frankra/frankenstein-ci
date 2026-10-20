@@ -1,0 +1,14 @@
+cmd/pull.go
+  h_679603e22ee0c9 253,255,257-262,266-271,273-275,277-281,283,285-292,295-298,300,302-303,305-306,308,312-314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "2b2781fdc93f8dbf7865de837885e50de196cad0",
+  "prompts": {},
+  "humans": {
+    "h_679603e22ee0c9": {
+      "author": "Rafael Frank <rafael.frank@deliveryhero.com>"
+    }
+  }
+}
