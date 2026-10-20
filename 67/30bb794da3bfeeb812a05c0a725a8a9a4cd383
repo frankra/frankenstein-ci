@@ -1,0 +1,16 @@
+pkg/rest/client.go
+  h_679603e22ee0c9 28
+cmd/pull.go
+  h_679603e22ee0c9 4-5,8-9,11-12,17-21,78-91,93-96,157-328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "6730bb794da3bfeeb812a05c0a725a8a9a4cd383",
+  "prompts": {},
+  "humans": {
+    "h_679603e22ee0c9": {
+      "author": "Rafael Frank <rafael.frank@deliveryhero.com>"
+    }
+  }
+}
