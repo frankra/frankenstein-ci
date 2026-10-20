@@ -25,7 +25,7 @@ func NewReadClient[Res any]() ReadClient[Res] {
 func (c *client[Res]) GetJSON(ctx context.Context, url string, headers map[string]string) (*Res, error) {
 	res := new(Res)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return res, fmt.Errorf("failed to create request, %w", err)
 	}

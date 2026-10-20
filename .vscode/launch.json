@@ -6,11 +6,11 @@
     "configurations": [
 
         {
-            "name": "puller",
+            "name": "pull",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/puller.go",
+            "program": "${workspaceFolder}/cmd/pull.go",
             "args": ["alpine"]
         }
     ]
