@@ -1,0 +1,14 @@
+.gitignore
+  h_679603e22ee0c9 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "fbb4e62d7c33e4c6953bbb61487d442093d7a1fe",
+  "prompts": {},
+  "humans": {
+    "h_679603e22ee0c9": {
+      "author": "Rafael Frank <rafael.frank@deliveryhero.com>"
+    }
+  }
+}
