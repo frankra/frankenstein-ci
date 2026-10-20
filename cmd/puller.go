@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/frankra/frankenstein-ci/pkg/host"
+	"golang.org/x/sync/errgroup"
 )
 
 type Layer struct {
@@ -161,93 +162,112 @@ func getManifest(client http.Client, auth AuthResponse, imageName string, metada
 
 func downloadLayers(client http.Client, auth AuthResponse, imageName string, layers []Layer) error {
 	extractDir := fmt.Sprintf("./images/%s", imageName)
-	if err := os.MkdirAll(extractDir, 0755); err != nil {
+	err := os.MkdirAll(extractDir, 0755)
+	if err != nil {
 		return fmt.Errorf("failed to create %s dir: %w", imageName, err)
 	}
 
+	g := errgroup.Group{}
 	for _, layer := range layers {
-		url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, layer.Digest)
+		g.Go(func() error {
+			return pipeGzip(
+				client,
+				auth,
+				imageName,
+				layer,
+				extractDir,
+			)
+		})
+	}
 
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
+	err = g.Wait()
+	if err != nil {
+
+	}
+
+	return nil
+}
+
+func pipeGzip(
+	client http.Client,
+	auth AuthResponse,
+	imageName string,
+	layer Layer,
+	extractDir string,
+) error {
+	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, layer.Digest)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+auth.Token)
+	req.Header.Set("Accept", layer.MediaType)
+
+	res, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to download layer %s: %w", layer.Digest, err)
+	}
+	defer res.Body.Close()
+	// Defer closing the body inside the loop via an anonymous function
+	// to avoid leaking file descriptors if we parallelize later.
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+
+	gzf, err := gzip.NewReader(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzf.Close()
+
+	tarReader := tar.NewReader(gzf)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of this layer's archive
 		}
-		req.Header.Set("Authorization", "Bearer "+auth.Token)
-		req.Header.Set("Accept", layer.MediaType)
-
-		res, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("failed to download layer %s: %w", layer.Digest, err)
+			return fmt.Errorf("tar reader error: %w", err)
 		}
 
-		// Defer closing the body inside the loop via an anonymous function
-		// to avoid leaking file descriptors if we parallelize later.
-		err = func() error {
-			defer res.Body.Close()
+		targetPath := filepath.Join(extractDir, header.Name)
 
-			if res.StatusCode != http.StatusOK {
-				return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+		// Some tarballs omit explicit directory entries, so we ensure the parent exists
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent dir: %w", err)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
 			}
-
-			gzf, err := gzip.NewReader(res.Body)
+		case tar.TypeReg:
+			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
 			if err != nil {
-				return fmt.Errorf("failed to create gzip reader: %w", err)
+				return fmt.Errorf("failed to create file: %w", err)
 			}
-			defer gzf.Close()
-
-			tarReader := tar.NewReader(gzf)
-
-			for {
-				header, err := tarReader.Next()
-				if err == io.EOF {
-					break // End of this layer's archive
-				}
-				if err != nil {
-					return fmt.Errorf("tar reader error: %w", err)
-				}
-
-				targetPath := filepath.Join(extractDir, header.Name)
-
-				// Some tarballs omit explicit directory entries, so we ensure the parent exists
-				if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-					return fmt.Errorf("failed to create parent dir: %w", err)
-				}
-
-				switch header.Typeflag {
-				case tar.TypeDir:
-					if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
-						return fmt.Errorf("failed to create directory: %w", err)
-					}
-				case tar.TypeReg:
-					outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
-					if err != nil {
-						return fmt.Errorf("failed to create file: %w", err)
-					}
-					if _, err := io.Copy(outFile, tarReader); err != nil {
-						outFile.Close()
-						return fmt.Errorf("failed to extract file: %w", err)
-					}
-					outFile.Close()
-				case tar.TypeSymlink:
-					// If a symlink already exists from a previous layer, remove it
-					os.Remove(targetPath)
-					if err := os.Symlink(header.Linkname, targetPath); err != nil {
-						return fmt.Errorf("failed to create symlink: %w", err)
-					}
-				case tar.TypeLink:
-					os.Remove(targetPath)
-					// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
-					linkTarget := filepath.Join(extractDir, header.Linkname)
-					if err := os.Link(linkTarget, targetPath); err != nil {
-						return fmt.Errorf("failed to create hardlink: %w", err)
-					}
-				}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return fmt.Errorf("failed to extract file: %w", err)
 			}
-			return nil
-		}()
-
-		if err != nil {
-			return err
+			outFile.Close()
+		case tar.TypeSymlink:
+			// If a symlink already exists from a previous layer, remove it
+			os.Remove(targetPath)
+			if err := os.Symlink(header.Linkname, targetPath); err != nil {
+				return fmt.Errorf("failed to create symlink: %w", err)
+			}
+		case tar.TypeLink:
+			os.Remove(targetPath)
+			// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
+			linkTarget := filepath.Join(extractDir, header.Linkname)
+			if err := os.Link(linkTarget, targetPath); err != nil {
+				return fmt.Errorf("failed to create hardlink: %w", err)
+			}
 		}
 	}
 	return nil
