@@ -250,68 +250,83 @@ func downloadLayer(
 // unzipping layers has to be sequential as per OCI
 func unzipLayers(layers []Layer, dir string) error {
 	for _, layer := range layers {
-		filePath := buildLayerFilePath(dir, layer.Digest)
-		file, err := os.Open(filePath)
+		err := unzipLayer(layer, dir)
 		if err != nil {
-			return fmt.Errorf("failed to read file %s: %w", filePath, err)
-		}
-
-		gzf, err := gzip.NewReader(file)
-		if err != nil {
-			return fmt.Errorf("failed to create gzip reader: %w", err)
-		}
-		defer gzf.Close()
-
-		tarReader := tar.NewReader(gzf)
-
-		for {
-			header, err := tarReader.Next()
-			if err == io.EOF {
-				break // End of this layer's archive
-			}
-			if err != nil {
-				return fmt.Errorf("tar reader error: %w", err)
-			}
-
-			targetPath := filepath.Join(dir, header.Name)
-
-			// Some tarballs omit explicit directory entries, so we ensure the parent exists
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-				return fmt.Errorf("failed to create parent dir: %w", err)
-			}
-
-			switch header.Typeflag {
-			case tar.TypeDir:
-				if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
-					return fmt.Errorf("failed to create directory: %w", err)
-				}
-			case tar.TypeReg:
-				outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
-				if err != nil {
-					return fmt.Errorf("failed to create file: %w", err)
-				}
-				if _, err := io.Copy(outFile, tarReader); err != nil {
-					outFile.Close()
-					return fmt.Errorf("failed to extract file: %w", err)
-				}
-				outFile.Close()
-			case tar.TypeSymlink:
-				// If a symlink already exists from a previous layer, remove it
-				os.Remove(targetPath)
-				if err := os.Symlink(header.Linkname, targetPath); err != nil {
-					return fmt.Errorf("failed to create symlink: %w", err)
-				}
-			case tar.TypeLink:
-				os.Remove(targetPath)
-				// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
-				linkTarget := filepath.Join(dir, header.Linkname)
-				if err := os.Link(linkTarget, targetPath); err != nil {
-					return fmt.Errorf("failed to create hardlink: %w", err)
-				}
-			}
+			return err
 		}
 	}
 
+	return nil
+}
+
+func unzipLayer(layer Layer, dir string) error {
+	filePath := buildLayerFilePath(dir, layer.Digest)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	gzf, err := gzip.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzf.Close()
+
+	tarReader := tar.NewReader(gzf)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of this layer's archive
+		}
+		if err != nil {
+			return fmt.Errorf("tar reader error: %w", err)
+		}
+		targetPath := filepath.Join(dir, header.Name)
+
+		// Docker whiteout handling
+		fileName := filepath.Base(header.Name)
+		if strings.HasPrefix(fileName, ".wh.") {
+			targetToDelete := filepath.Join(filepath.Dir(targetPath), strings.TrimPrefix(fileName, ".wh."))
+			os.RemoveAll(targetToDelete)
+			continue // Skip creating the .wh. file
+		}
+
+		// Some tarballs omit explicit directory entries, so we ensure the parent exists
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return fmt.Errorf("failed to create parent dir: %w", err)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("failed to create directory: %w", err)
+			}
+		case tar.TypeReg:
+			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return fmt.Errorf("failed to create file: %w", err)
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return fmt.Errorf("failed to extract file: %w", err)
+			}
+			outFile.Close()
+		case tar.TypeSymlink:
+			// If a symlink already exists from a previous layer, remove it
+			os.Remove(targetPath)
+			if err := os.Symlink(header.Linkname, targetPath); err != nil {
+				return fmt.Errorf("failed to create symlink: %w", err)
+			}
+		case tar.TypeLink:
+			os.Remove(targetPath)
+			// Hardlinks in tar point to paths relative to the tar root, so we prepend extractDir
+			linkTarget := filepath.Join(dir, header.Linkname)
+			if err := os.Link(linkTarget, targetPath); err != nil {
+				return fmt.Errorf("failed to create hardlink: %w", err)
+			}
+		}
+	}
 	return nil
 }
 
