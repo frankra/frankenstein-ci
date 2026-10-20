@@ -1,0 +1,16 @@
+containers/alpine/main.go
+  h_679603e22ee0c9 1-76
+apko/apko.yaml
+  h_679603e22ee0c9 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "d513d39516e77ad047211b1e87e43f5f781aa8ad",
+  "prompts": {},
+  "humans": {
+    "h_679603e22ee0c9": {
+      "author": "Rafael Frank <rafael.frank@deliveryhero.com>"
+    }
+  }
+}
