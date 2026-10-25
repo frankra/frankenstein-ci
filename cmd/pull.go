@@ -164,6 +164,8 @@ func parallelDownload(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	fmt.Printf("Downloading image: %s, layer count: %v /n", imageName, len(layers))
+
 	g := errgroup.Group{}
 	for _, layer := range layers {
 		g.Go(func() error {

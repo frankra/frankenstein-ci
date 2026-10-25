@@ -31,6 +31,23 @@ func GetMachineArch() string {
 	if err != nil {
 		return "unknown"
 	}
+	raw := strings.TrimSpace(out.String())
 
-	return strings.TrimSpace(out.String())
+	return normalizeArch(raw)
+}
+
+// Maps system architecture names (like from uname -m) to OCI/Docker standard names
+func normalizeArch(arch string) string {
+	switch arch {
+	case "x86_64":
+		return "amd64"
+	case "aarch64":
+		return "arm64"
+	case "i386", "i686":
+		return "386"
+	case "armv7l", "armv8l":
+		return "arm"
+	default:
+		return arch // Fallback to returning it exactly as-is
+	}
 }
