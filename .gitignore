@@ -32,5 +32,7 @@ go.work.sum
 # .idea/
 # .vscode/
 
-images/*
+experiments/images/*
 *.tar
+*.apk
+cosign.key

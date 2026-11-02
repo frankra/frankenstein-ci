@@ -1,69 +1,137 @@
 # Frankenstein-CI
-Miniature end-to-end container factory
 
-## Milestone 1: The Raw OCI Puller (Registry → Disk)
+> **A from-scratch exploration of the OCI ecosystem, Linux container internals, declarative Wolfi/`apko`/`melange` image builds, and cryptographic supply chain provenance in Go.**
 
-> Forget the `docker` CLI exists. A registry is just a web server returning JSON and `.tar.gz` files.
-
-*   **The Goal:** Write a Go CLI that talks to Chainguard's registry (`cgr.dev`) or Docker Hub, downloads an image, and unpacks its filesystem locally.
-*   **Requirements (Pure Go):**
-    1. Make an HTTP `GET` request to the registry API to fetch the OCI Manifest for an image (e.g., `cgr.dev/chainguard/static:latest` or `cgr.dev/chainguard/wolfi-base:latest`). *Note: You will need to handle the Bearer token auth handshake first.*
-    2. Parse the JSON manifest to extract the list of layers (identified by their SHA256 digests).
-    3. Iterate through the layers and download the `.tar.gz` blobs using HTTP `GET`.
-    4. Use Go's `archive/tar` and `compress/gzip` to extract them in order into a local directory (e.g., `./images/<name>`).
-*   **Success Criteria:** You can `cd` into `./images/static` and inspect `/etc/apko.json`, `/etc/passwd`, and `/usr/lib/apk/db/installed`.
+`frankenstein-ci` is a miniature end-to-end container factory built without relying on the `docker` daemon or imperative `Dockerfile` builds. Every component is implemented or wired from first principles to dissect how hardened, distroless container images are built, distributed, verified, and executed.
 
 ---
 
-## Milestone 2: The Nano-Runtime (Disk → Container)
+## Architecture & End-to-End Flow
 
-> Now that you have a root filesystem on your disk, you are going to turn it into a container using Go system calls.
+```mermaid
+flowchart LR
+    subgraph Build["1. Declarative Build (experiments/)"]
+        G["runtime/main.go\n(Go HTTP Server)"] --> M["melange.yaml\n(Source → .apk)"]
+        M --> A["apko.yaml\n(.apk → OCI Layer + SPDX SBOM)"]
+    end
 
-*   **The Goal:** Write a Go program that isolates a process inside the `rootfs` folder you just downloaded.
-*   **Requirements (Pure Go):**
-    1. Use `os/exec` to execute a command (like `/bin/sh`) but configure the `SysProcAttr` to spawn it in new namespaces: `syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS`.
-    2. Before the command runs, the Go program must `syscall.Chroot("./rootfs")` and `syscall.Chdir("/")`.
-    3. Mount the `proc` filesystem inside the chroot so processes can be tracked (`syscall.Mount("proc", "proc", "proc", 0, "")`).
-*   **Success Criteria:** When you run your Go program, it drops you into a shell. If you type `ps`, you only see your shell (PID 1). If you type `hostname`, you can change it without affecting your actual host machine. You have just built Docker.
+    subgraph Dist["2. OCI Distribution (cli/ & registry/)"]
+        C["OCI Client (cli/)\nPush / Pull / Digest Verify"] <--> R["Pocket OCI Registry (registry/)\nCAS Blobs + Manifests + Referrers API"]
+        Cgr["Chainguard Registry\n(cgr.dev/chainguard/*)"] --> C
+    end
 
----
+    subgraph Prov["3. Provenance (experiments/cosign/)"]
+        S["cosign\nSign & Verify + Attestations"] --> R
+    end
 
-## Milestone 3: The Declarative Builder (Code → OCI Image)
+    subgraph Run["4. Execution (experiments/linux-container/)"]
+        N["Linux Nano-Runtime\nNamespaces + Chroot + Cgroups"]
+    end
 
-> Now we throw away imperative Dockerfiles and use Chainguard's actual tooling to build an image from scratch.
-
-*   **The Goal:** Compile a simple app and package it as an OCI image without ever running `docker build`.
-*   **Requirements:**
-    1. Write a simple 20-line Go HTTP server (`main.go`).
-    2. Write a `melange.yaml` file. Use it to compile your Go code into an Alpine/Wolfi package (`.apk`).
-    3. Write an `apko.yaml` file. Define your base system, add your newly built `.apk`, and use the `apko build` CLI to assemble them into a raw OCI image tarball.
-*   **Success Criteria:** You end up with a file named `image.tar`. If you load it into Docker (`docker load < image.tar`) and run it, your Go HTTP server boots up.
-
----
-
-## Milestone 4: The Pocket OCI Registry (OCI Distribution Spec Server)
-
-> A container registry is just a content-addressable blob store (`sha256`) and a manifest pointer table over HTTP.
-
-*   **The Goal:** Write a compliant OCI Distribution Spec registry server in Go (`cmd/registry/main.go`) that stores blobs and manifests on disk and supports `docker push`, `apko publish`, `cosign`, and `cmd/pull.go`.
-*   **Requirements (Pure Go):**
-    1. Implement `GET /v2/` version check handshake (`Docker-Distribution-API-Version: registry/2.0`).
-    2. Implement content-addressable blob storage (`HEAD /v2/<name>/blobs/<digest>` and `GET /v2/<name>/blobs/<digest>`, plus HTTP `Range` requests for lazy loading).
-    3. Implement monolithic & chunked blob uploads (`POST /v2/<name>/blobs/uploads/`, `PATCH`, and `PUT ?digest=sha256:...`), verifying the `sha256` digest on the fly before committing the blob to disk.
-    4. Implement manifest storage & tag resolution (`PUT` and `GET /v2/<name>/manifests/<reference>`), supporting OCI Image Index, OCI Image Manifest, and the **OCI 1.1 Referrers API** (`GET /v2/<name>/referrers/<digest>`) for attaching SBOMs and signatures.
-*   **Success Criteria:** You can push your `apko`-built image directly to `localhost:5000/my-app:latest`, pull it back with `cmd/pull.go` or `docker pull`, and see the deduplicated `sha256` blobs on disk.
+    A --> C
+    C --> N
+```
 
 ---
 
-## Milestone 5: Cryptographic Provenance (Sign & Verify)
+## Repository Map
 
-> A supply chain is only secure if it's verifiable.
+```text
+frankenstein-ci/
+├── go.mod
+├── README.md
+│
+├── cli/                     # Milestone 1: Pure-Go OCI Registry Client (Pull & Push)
+│   └── pull.go              # Token handshake, multi-arch OCI Index resolution, parallel layer downloads & whiteout extraction
+│
+├── registry/                # Milestone 4: OCI Distribution Spec Registry Server
+│   ├── cmd/
+│   │   └── main.go          # HTTP server entrypoint
+│   └── internal/            # Content-addressable blob store (SHA-256), upload sessions, manifest & OCI 1.1 referrers index
+│
+├── experiments/             # Hands-on dissections of container internals & Chainguard tooling
+│   ├── linux-container/     # Milestone 2: Linux Nano-Runtime (namespaces, chroot, /proc mount, cgroups)
+│   │   └── main.go
+│   ├── runtime/             # Milestone 3 Target App: Minimal Go HTTP server packaged via melange & apko
+│   │   └── main.go
+│   ├── apko/                # Milestone 3a: Declarative Wolfi image assembly & build-time SPDX SBOMs
+│   │   ├── apko.yaml
+│   │   └── sbom-*.spdx.json
+│   ├── melange/             # Milestone 3b: Compiling Go source into a signed Wolfi .apk package
+│   ├── cosign/              # Milestone 5: Cryptographic image signing & attestation verification
+│   └── images/              # Extracted root filesystems (e.g., cgr.dev/chainguard/static) for inspection
+│
+├── pkg/                     # Shared Go libraries across CLI and Registry
+│   ├── host/                # Host OS/architecture detection & OCI platform normalization
+│   │   └── arch.go
+│   └── rest/                # Generic typed HTTP/JSON client
+│       └── client.go
+│
+└── bruno/                   # API request collection for inspecting OCI registry handshakes & manifests
+```
 
-*   **The Goal:** Sign your newly built image in your own OCI registry and verify the signature and SBOM attestation to prove it hasn't been tampered with.
-*   **Requirements:**
-    1. Push your `apko`-built image to your local OCI registry (`localhost:5000/my-app:latest`) or an ephemeral registry (`ttl.sh`).
-    2. Install `cosign`.
-    3. Generate a keypair: `cosign generate-key-pair`.
-    4. Sign the image in the registry using your private key: `cosign sign --key cosign.key localhost:5000/my-app:latest`.
-    5. Verify the image using your public key (`cosign verify --key cosign.pub localhost:5000/my-app:latest`), and inspect how `cosign` stored the signature artifact in your registry!
-*   **Success Criteria:** The `cosign verify` command returns a JSON payload showing the cryptographic signature and the exact digest of the image, and you can inspect the `.sig` / Referrers manifest directly inside your registry's storage folder.
+---
+
+## Milestones
+
+### Milestone 1: The Raw OCI Puller (`cli/pull.go`) — ✅ Completed
+
+> Forget the `docker` CLI exists. An OCI registry is an HTTP server serving content-addressable JSON descriptors and `.tar.gz` layer blobs.
+
+* **What it does:** Talks directly to Chainguard's public registry (`cgr.dev/chainguard/*`), negotiates Bearer token authentication, resolves the multi-architecture **OCI Image Index** (`application/vnd.oci.image.index.v1+json`) for the host CPU architecture, downloads compressed layer blobs concurrently using `errgroup`, and extracts them sequentially into `experiments/images/<name>` while respecting OCI whiteout files (`.wh.*`).
+* **Run it:**
+  ```bash
+  # Pull Chainguard's distroless static image from cgr.dev
+  go run ./cli/pull.go static
+  ```
+* **Key Takeaways from Inspecting `cgr.dev/chainguard/static`:**
+  * **Distroless by Default:** `/bin` and `/usr/bin` contain zero shells (`/bin/sh`) and zero package managers (`apk`), eliminating RCE shell-out vectors and unnecessary CVEs.
+  * **Declarative Provenance (`/etc/apko.json`):** Contains the exact pinned Wolfi packages (`wolfi-baselayout`, `ca-certificates-bundle`, `tzdata`) and unprivileged user configuration (`nonroot`, UID `65532`).
+  * **Scanner Transparency (`/usr/lib/apk/db/installed` & `/var/lib/db/sbom/*.spdx.json`):** Even without the `apk` binary present, `apko` writes the package database and per-package SPDX SBOMs so vulnerability scanners can audit the rootfs without executing code inside the container.
+
+---
+
+### Milestone 2: The Linux Nano-Runtime (`experiments/linux-container/main.go`) — ✅ Completed
+
+> A "container" is not a hardware boundary—it is a standard Linux process isolated by kernel namespaces, a restricted root filesystem, and cgroup resource limits.
+
+* **What it does:** Spawns a child process using `syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS`, isolates the root filesystem via `syscall.Chroot` into an extracted image directory, mounts `/proc` and a `tmpfs` mount inside the namespace, and configures cgroup process limits (`pids.max`).
+* **Run it (Linux / WSL2 as root):**
+  ```bash
+  go run ./experiments/linux-container/main.go run /bin/sh
+  ```
+
+---
+
+### Milestone 3: Declarative Image Building with Wolfi, `melange`, and `apko` (`experiments/runtime/`, `experiments/melange/`, `experiments/apko/`) — 🚧 In Progress
+
+> Replace imperative, non-reproducible `Dockerfile` `RUN` layers with declarative package compilation (`melange`) and daemonless image assembly (`apko`).
+
+* **Progress & Goals:**
+  * [x] Assemble a multi-arch (`amd64`, `arm64`), non-root (`UID 65532`) Wolfi image using [`experiments/apko/apko.yaml`](./experiments/apko/apko.yaml) and generate build-time SPDX SBOMs (`sbom-x86_64.spdx.json`, `sbom-aarch64.spdx.json`, `sbom-index.spdx.json`).
+  * [x] Write a minimal Go HTTP server ([`experiments/runtime/main.go`](./experiments/runtime/main.go)) that reports its runtime OS, architecture, UID/GID, and PID.
+  * [ ] Package the Go HTTP server into a signed Wolfi `.apk` using `melange.yaml` in `experiments/melange/`.
+  * [ ] Compose the custom `.apk` with `wolfi-baselayout` and `ca-certificates-bundle` via `apko build` into a zero-CVE distroless OCI image tarball.
+
+---
+
+### Milestone 4: The Pocket OCI Registry (`registry/`) — 📋 Planned
+
+> Implement an [OCI Distribution Spec](https://github.com/opencontainers/distribution-spec) compliant registry server in Go from scratch.
+
+* **Goals (Pure Go):**
+  1. **Handshake:** `GET /v2/` (`Docker-Distribution-API-Version: registry/2.0`).
+  2. **Content-Addressable Blob Store:** `HEAD` and `GET /v2/<name>/blobs/<digest>` with deduplicated `sha256` storage and HTTP `Range` request support (the foundation for lazy-loading container images).
+  3. **Verified Blob Uploads:** `POST /v2/<name>/blobs/uploads/`, `PATCH`, and `PUT ?digest=sha256:...`, streaming uploads while computing `crypto/sha256` on the fly before committing blobs atomically.
+  4. **Manifests & OCI 1.1 Referrers API:** `PUT` and `GET /v2/<name>/manifests/<reference>` plus `GET /v2/<name>/referrers/<digest>` so `cosign` can attach signatures and SBOM attestations directly to image digests.
+
+---
+
+### Milestone 5: Cryptographic Supply Chain Provenance (`experiments/cosign/`) — 📋 Planned
+
+> A container image is only trustworthy if its identity and build provenance are cryptographically verifiable.
+
+* **Goals:**
+  1. Push the `apko`-built image to our local OCI registry (`registry/`).
+  2. Sign the image digest and attach the `apko`-generated SPDX SBOM as an in-toto attestation using Sigstore's `cosign`.
+  3. Verify the signature and attestation (`cosign verify` / `cosign verify-attestation`), and inspect how the `.sig` / OCI Referrers manifest is stored inside the registry's content-addressable store.

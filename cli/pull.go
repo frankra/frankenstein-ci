@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	LAYERS_FOLDER string = ".layers" //contains the unzipped tar.gz layer files for the image
+	IMAGES_BASE_DIR string = "./experiments/images" // base directory where pulled image rootfs folders are stored
+	LAYERS_FOLDER   string = ".layers"              // contains the compressed .tar.gz layer blobs during download
 )
 
 type Layer struct {
@@ -197,12 +198,12 @@ func parallelDownload(
 
 // makes the folder where the image content will be maintained
 func makeImageDir(imageName string) (string, error) {
-	dir := fmt.Sprintf("./images/%s", imageName)
+	dir := filepath.Join(IMAGES_BASE_DIR, imageName)
 	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		return dir, fmt.Errorf("failed to create %s dir: %w", imageName, err)
 	}
-	layersFolder := fmt.Sprintf("%s/%s", dir, LAYERS_FOLDER)
+	layersFolder := filepath.Join(dir, LAYERS_FOLDER)
 	err = os.MkdirAll(layersFolder, 0755)
 	if err != nil {
 		return dir, fmt.Errorf("failed to create layers folder dir for %s : %w", imageName, err)
