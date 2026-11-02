@@ -1,13 +1,15 @@
 contents:
   repositories:
     - https://packages.wolfi.dev/os
+    - /work/experiments/melange/packages
   keyring:
     - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    - /work/experiments/melange/melange.rsa.pub
   packages:
     - wolfi-baselayout
     - ca-certificates-bundle
-    - python-3.12
     - tzdata
+    - frankenstein-runtime
 
 accounts:
   groups:
@@ -16,9 +18,17 @@ accounts:
   users:
     - username: nonroot
       uid: 65532
+      gid: 65532
   run-as: 65532
-archs: ["arm64", "amd64"]
+
+archs:
+  - x86_64
+  - aarch64
+
 entrypoint:
-  command: /usr/bin/python -m http.server 8080
+  command: /usr/bin/frankenstein-runtime
+
+environment:
+  PORT: "8080"
 
 work-dir: /home/nonroot

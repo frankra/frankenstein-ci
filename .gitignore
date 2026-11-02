@@ -32,7 +32,12 @@ go.work.sum
 # .idea/
 # .vscode/
 
+images/*
 experiments/images/*
+experiments/melange/packages/
+experiments/melange/*.rsa
+experiments/cosign/*.key
+experiments/cosign/published-image.ref
 *.tar
 *.apk
 cosign.key
