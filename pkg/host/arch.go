@@ -19,7 +19,7 @@ func GetMachineArch() string {
 		if arch == "" {
 			arch = os.Getenv("PROCESSOR_ARCHITECTURE")
 		}
-		return arch
+		return normalizeArch(strings.ToLower(arch))
 	default:
 		// Unix-like systems (Linux, macOS, FreeBSD) use `uname -m`
 		cmd = exec.Command("uname", "-m")

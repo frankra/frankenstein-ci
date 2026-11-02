@@ -43,14 +43,21 @@ type ManifestsResponse struct {
 
 type AuthResponse struct {
 	Token       string    `json:"token"`
-	AccessToken string    `json:"access_token"`
+	AccessToken string    `json:"access_token"` // for docker
 	ExpiresIn   int       `json:"expires_in"`
 	IssuedAt    time.Time `json:"issued_at"`
 }
 
+func (a AuthResponse) BearerToken() string {
+	if a.Token != "" {
+		return a.Token
+	}
+	return a.AccessToken
+}
+
 func main() {
-	if len(os.Args) < 2 && os.Args[1] == "" {
-		panic("command requires an image name as argument")
+	if len(os.Args) < 2 || os.Args[1] == "" {
+		panic("command requires an image name as argument (e.g. static, wolfi-base, go)")
 	}
 	imageName := os.Args[1]
 
@@ -108,7 +115,7 @@ func findManifestForCurrentArch(resp ManifestsResponse) (ManifestMetadata, error
 }
 
 func getAuth(ctx context.Context, imageName string) (AuthResponse, error) {
-	authUrl := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/%s:pull", imageName)
+	authUrl := fmt.Sprintf("https://cgr.dev/token?service=cgr.dev&scope=repository:chainguard/%s:pull", imageName)
 
 	client := rest.NewReadClient[AuthResponse]()
 	auth, err := client.GetJSON(
@@ -123,12 +130,12 @@ func getAuth(ctx context.Context, imageName string) (AuthResponse, error) {
 }
 
 func getManifests(ctx context.Context, auth AuthResponse, imageName string) (ManifestsResponse, error) {
-	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/manifests/latest", imageName)
+	url := fmt.Sprintf("https://cgr.dev/v2/chainguard/%s/manifests/latest", imageName)
 	client := rest.NewReadClient[ManifestsResponse]()
 
 	headers := map[string]string{
-		"Authorization": "Bearer " + auth.AccessToken,
-		"Accept":        "application/vnd.docker.distribution.manifest.v2+json",
+		"Authorization": "Bearer " + auth.BearerToken(),
+		"Accept":        "application/vnd.oci.image.index.v1+json",
 	}
 
 	res, err := client.GetJSON(ctx, url, headers)
@@ -139,12 +146,12 @@ func getManifests(ctx context.Context, auth AuthResponse, imageName string) (Man
 }
 
 func getManifest(ctx context.Context, auth AuthResponse, imageName string, metadata ManifestMetadata) (Manifest, error) {
-	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, metadata.Digest)
+	url := fmt.Sprintf("https://cgr.dev/v2/chainguard/%s/manifests/%s", imageName, metadata.Digest)
 	client := rest.NewReadClient[Manifest]()
 
 	headers := map[string]string{
-		"Authorization": "Bearer " + auth.AccessToken,
-		"Accept":        "application/vnd.docker.distribution.manifest.v2+json",
+		"Authorization": "Bearer " + auth.BearerToken(),
+		"Accept":        "application/vnd.oci.image.manifest.v1+json",
 	}
 
 	res, err := client.GetJSON(ctx, url, headers)
@@ -164,7 +171,7 @@ func parallelDownload(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	fmt.Printf("Downloading image: %s, layer count: %v /n", imageName, len(layers))
+	fmt.Printf("Downloading image: %s, layer count: %v\n", imageName, len(layers))
 
 	g := errgroup.Group{}
 	for _, layer := range layers {
@@ -212,13 +219,13 @@ func downloadLayer(
 	dir string,
 ) error {
 	client := http.Client{}
-	url := fmt.Sprintf("https://registry-1.docker.io/v2/library/%s/blobs/%s", imageName, layer.Digest)
+	url := fmt.Sprintf("https://cgr.dev/v2/chainguard/%s/blobs/%s", imageName, layer.Digest)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+auth.Token)
+	req.Header.Set("Authorization", "Bearer "+auth.BearerToken())
 	req.Header.Set("Accept", layer.MediaType)
 
 	res, err := client.Do(req)
@@ -267,6 +274,7 @@ func unzipLayer(layer Layer, dir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
+	defer file.Close()
 
 	gzf, err := gzip.NewReader(file)
 	if err != nil {
