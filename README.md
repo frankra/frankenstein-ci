@@ -5,13 +5,13 @@ Miniature end-to-end container factory
 
 > Forget the `docker` CLI exists. A registry is just a web server returning JSON and `.tar.gz` files.
 
-*   **The Goal:** Write a Go CLI that talks to Docker Hub (or `cgr.dev`), downloads an image, and unpacks its filesystem locally.
+*   **The Goal:** Write a Go CLI that talks to Chainguard's registry (`cgr.dev`) or Docker Hub, downloads an image, and unpacks its filesystem locally.
 *   **Requirements (Pure Go):**
-    1. Make an HTTP `GET` request to the registry API to fetch the OCI Manifest for an image (e.g., `alpine:latest` or `cgr.dev/chainguard/static:latest`). *Note: You will need to handle the Bearer token auth handshake first.*
+    1. Make an HTTP `GET` request to the registry API to fetch the OCI Manifest for an image (e.g., `cgr.dev/chainguard/static:latest` or `cgr.dev/chainguard/wolfi-base:latest`). *Note: You will need to handle the Bearer token auth handshake first.*
     2. Parse the JSON manifest to extract the list of layers (identified by their SHA256 digests).
     3. Iterate through the layers and download the `.tar.gz` blobs using HTTP `GET`.
-    4. Use Go's `archive/tar` and `compress/gzip` to extract them in order into a local directory (e.g., `./rootfs`).
-*   **Success Criteria:** You can `cd` into `./rootfs` and see `bin/`, `etc/`, `usr/`, etc.
+    4. Use Go's `archive/tar` and `compress/gzip` to extract them in order into a local directory (e.g., `./images/<name>`).
+*   **Success Criteria:** You can `cd` into `./images/static` and inspect `/etc/apko.json`, `/etc/passwd`, and `/usr/lib/apk/db/installed`.
 
 ---
 
@@ -41,15 +41,29 @@ Miniature end-to-end container factory
 
 ---
 
-## Milestone 4: Cryptographic Provenance (Sign & Verify)
+## Milestone 4: The Pocket OCI Registry (OCI Distribution Spec Server)
+
+> A container registry is just a content-addressable blob store (`sha256`) and a manifest pointer table over HTTP.
+
+*   **The Goal:** Write a compliant OCI Distribution Spec registry server in Go (`cmd/registry/main.go`) that stores blobs and manifests on disk and supports `docker push`, `apko publish`, `cosign`, and `cmd/pull.go`.
+*   **Requirements (Pure Go):**
+    1. Implement `GET /v2/` version check handshake (`Docker-Distribution-API-Version: registry/2.0`).
+    2. Implement content-addressable blob storage (`HEAD /v2/<name>/blobs/<digest>` and `GET /v2/<name>/blobs/<digest>`, plus HTTP `Range` requests for lazy loading).
+    3. Implement monolithic & chunked blob uploads (`POST /v2/<name>/blobs/uploads/`, `PATCH`, and `PUT ?digest=sha256:...`), verifying the `sha256` digest on the fly before committing the blob to disk.
+    4. Implement manifest storage & tag resolution (`PUT` and `GET /v2/<name>/manifests/<reference>`), supporting OCI Image Index, OCI Image Manifest, and the **OCI 1.1 Referrers API** (`GET /v2/<name>/referrers/<digest>`) for attaching SBOMs and signatures.
+*   **Success Criteria:** You can push your `apko`-built image directly to `localhost:5000/my-app:latest`, pull it back with `cmd/pull.go` or `docker pull`, and see the deduplicated `sha256` blobs on disk.
+
+---
+
+## Milestone 5: Cryptographic Provenance (Sign & Verify)
 
 > A supply chain is only secure if it's verifiable.
 
-*   **The Goal:** Sign your newly built image and verify the signature to prove it hasn't been tampered with.
+*   **The Goal:** Sign your newly built image in your own OCI registry and verify the signature and SBOM attestation to prove it hasn't been tampered with.
 *   **Requirements:**
-    1. Push your apko-built image to a temporary registry. (Use `ttl.sh`—it's an anonymous, ephemeral registry perfect for testing. E.g., push to `ttl.sh/rafael-test-image:1h`).
+    1. Push your `apko`-built image to your local OCI registry (`localhost:5000/my-app:latest`) or an ephemeral registry (`ttl.sh`).
     2. Install `cosign`.
     3. Generate a keypair: `cosign generate-key-pair`.
-    4. Sign the image in the registry using your private key: `cosign sign --key cosign.key ttl.sh/rafael-test-image:1h`.
-    5. Verify the image using your public key.
-*   **Success Criteria:** The `cosign verify` command returns a JSON payload showing the cryptographic signature and the exact digest of the image, proving the provenance of the artifact.
+    4. Sign the image in the registry using your private key: `cosign sign --key cosign.key localhost:5000/my-app:latest`.
+    5. Verify the image using your public key (`cosign verify --key cosign.pub localhost:5000/my-app:latest`), and inspect how `cosign` stored the signature artifact in your registry!
+*   **Success Criteria:** The `cosign verify` command returns a JSON payload showing the cryptographic signature and the exact digest of the image, and you can inspect the `.sig` / Referrers manifest directly inside your registry's storage folder.
