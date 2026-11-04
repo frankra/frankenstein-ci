@@ -16,19 +16,19 @@ flowchart LR
     end
 
     subgraph Dist["2. OCI Distribution (cli/ & registry/)"]
-        C["OCI Client (cli/)\nPush / Pull / Digest Verify"] <--> R["Pocket OCI Registry (registry/)\nCAS Blobs + Manifests + Referrers API"]
+        C["OCI Client (cli/)\nPush / Pull / Digest Verify"] <--> R["OCI Registry\n(ttl.sh / local registry/)"]
         Cgr["Chainguard Registry\n(cgr.dev/chainguard/*)"] --> C
     end
 
     subgraph Prov["3. Provenance (experiments/cosign/)"]
-        S["cosign\nSign & Verify + Attestations"] --> R
+        S["cosign\nSign & Verify + SPDX Attestations"] --> R
     end
 
     subgraph Run["4. Execution (experiments/linux-container/)"]
         N["Linux Nano-Runtime\nNamespaces + Chroot + Cgroups"]
     end
 
-    A --> C
+    A --> R
     C --> N
 ```
 
@@ -89,10 +89,10 @@ frankenstein-ci/
 ├── cli/                     # Milestone 1: Pure-Go OCI Registry Client (Pull & Push)
 │   └── pull.go              # Token handshake, multi-arch OCI Index resolution, parallel layer downloads & whiteout extraction
 │
-├── registry/                # Milestone 4: OCI Distribution Spec Registry Server
+├── registry/                # Milestone 4 (Stretch): OCI Distribution Spec / Mini-Chainguard Factory
 │   ├── cmd/
 │   │   └── main.go          # HTTP server entrypoint
-│   └── internal/            # Content-addressable blob store (SHA-256), upload sessions, manifest & OCI 1.1 referrers index
+│   └── internal/            # Content-addressable blob store (SHA-256), SBOM index & rebuild pipeline
 │
 ├── experiments/             # Hands-on dissections of container internals & Chainguard tooling
 │   ├── linux-container/     # Milestone 2: Linux Nano-Runtime (namespaces, chroot, /proc mount, cgroups)
@@ -105,6 +105,7 @@ frankenstein-ci/
 │   ├── melange/             # Milestone 3b: Compiling Go source into a signed Wolfi .apk package
 │   │   └── melange.yaml
 │   ├── cosign/              # Milestone 5: Cryptographic image signing & attestation verification
+│   │   └── cosign.pub
 │   └── images/              # Extracted root filesystems (e.g., cgr.dev/chainguard/static) for inspection
 │
 ├── pkg/                     # Shared Go libraries across CLI and Registry
@@ -171,23 +172,22 @@ frankenstein-ci/
 
 ---
 
-### Milestone 4: The Pocket OCI Registry (`registry/`) — 📋 Planned
-
-> Implement an [OCI Distribution Spec](https://github.com/opencontainers/distribution-spec) compliant registry server in Go from scratch.
-
-* **Goals (Pure Go):**
-  1. **Handshake:** `GET /v2/` (`Docker-Distribution-API-Version: registry/2.0`).
-  2. **Content-Addressable Blob Store:** `HEAD` and `GET /v2/<name>/blobs/<digest>` with deduplicated `sha256` storage and HTTP `Range` request support (the foundation for lazy-loading container images).
-  3. **Verified Blob Uploads:** `POST /v2/<name>/blobs/uploads/`, `PATCH`, and `PUT ?digest=sha256:...`, streaming uploads while computing `crypto/sha256` on the fly before committing blobs atomically.
-  4. **Manifests & OCI 1.1 Referrers API:** `PUT` and `GET /v2/<name>/manifests/<reference>` plus `GET /v2/<name>/referrers/<digest>` so `cosign` can attach signatures and SBOM attestations directly to image digests.
-
----
-
-### Milestone 5: Cryptographic Supply Chain Provenance (`experiments/cosign/`) — 🚧 Ready to Run (`make all`)
+### Milestone 4: Cryptographic Supply Chain Provenance (`experiments/cosign/`) — ✅ Completed
 
 > A container image is only trustworthy if its identity and build provenance are cryptographically verifiable.
 
-* **Workflow:**
-  1. `make publish-image`: Uses `apko publish` to push the image directly to an OCI registry without Docker and records its immutable `@sha256:...` digest.
-  2. `make sign` & `make verify`: Signs the image digest with `cosign` and verifies the cryptographic signature.
-  3. `make attest` & `make verify-attestation`: Attaches the `apko`-generated SPDX SBOM (`sbom-index.spdx.json`) as a signed in-toto attestation on the image and verifies it.
+* **How It Works End-to-End (`make all`):**
+  1. **`make publish-image`:** Uses `apko publish` to push the image directly to an OCI registry (`ttl.sh/frankenstein-runtime:1h`) without a Docker daemon and records its immutable content-addressable digest (`@sha256:b6e99545...`).
+  2. **`make sign` & `make verify`:** Signs the immutable image digest using Sigstore's `cosign` (`cosign.key`) and verifies the cryptographic signature against `experiments/cosign/cosign.pub`.
+  3. **`make attest` & `make verify-attestation`:** Attaches the build-time SPDX SBOM (`experiments/apko/sbom-index.spdx.json`) as a signed in-toto attestation directly onto the OCI image in the registry, and verifies the attestation payload.
+
+---
+
+### Milestone 5 (Stretch): Mini Chainguard Container Factory & Registry (`registry/`) — 📋 Planned / Design Study
+
+> Explore the system design of a continuous zero-CVE container factory: OCI distribution, SBOM indexing, CVE feed ingestion, and automated `apko` rebuilds.
+
+* **Architecture Goals:**
+  1. **OCI Distribution Registry:** Serve and accept OCI manifests, blobs (`sha256` CAS), and OCI 1.1 Referrers (signatures & SBOM attestations).
+  2. **SBOM & Package Dependency Graph:** Index the SPDX SBOMs of published images (`image -> [package@version]`).
+  3. **CVE Feed & Automated Rebuild Loop:** Ingest a vulnerability/advisory feed (or Wolfi package update event), query which images depend on the affected package, trigger an idempotent `apko` rebuild + `cosign` re-signing job, and emit a customer webhook/notification.

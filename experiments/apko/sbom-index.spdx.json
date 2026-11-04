@@ -1,6 +1,6 @@
 {
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "sbom-sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+  "name": "sbom-sha256:b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
   "spdxVersion": "SPDX-2.3",
   "creationInfo": {
     "created": "2026-10-28T20:49:35Z",
@@ -13,13 +13,13 @@
   "dataLicense": "CC0-1.0",
   "documentNamespace": "https://spdx.org/spdxdocs/apko/",
   "documentDescribes": [
-    "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9"
+    "SPDXRef-Package-sha256-b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852"
   ],
   "packages": [
     {
-      "SPDXID": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
-      "name": "sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
-      "versionInfo": "sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "SPDXID": "SPDXRef-Package-sha256-b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
+      "name": "sha256:b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
+      "versionInfo": "sha256:b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
       "filesAnalyzed": false,
       "description": "Multi-arch image index",
       "downloadLocation": "NOASSERTION",
@@ -29,21 +29,21 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9"
+          "checksumValue": "b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9?mediaType=application%2Fvnd.oci.image.index.v1%2Bjson",
+          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852?mediaType=application%2Fvnd.oci.image.index.v1%2Bjson",
           "referenceType": "purl"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-sha256-4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
-      "name": "sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
-      "versionInfo": "sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
+      "SPDXID": "SPDXRef-Package-sha256-c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6",
+      "name": "sha256:c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6",
+      "versionInfo": "sha256:c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6",
       "filesAnalyzed": false,
       "downloadLocation": "NOASSERTION",
       "supplier": "Organization: Chainguard, Inc.",
@@ -51,36 +51,36 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd"
+          "checksumValue": "c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
+          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
           "referenceType": "purl"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC644d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
+      "SPDXID": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC64bec6acf564044d4da34a38ef45fbf83f95e9df9e",
       "name": "github.com/frankra/frankenstein-ci.git",
-      "versionInfo": "4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
+      "versionInfo": "bec6acf564044d4da34a38ef45fbf83f95e9df9e",
       "filesAnalyzed": false,
       "description": "Image configuration source",
-      "downloadLocation": "git+ssh://github.com/frankra/frankenstein-ci.git@4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
+      "downloadLocation": "git+ssh://github.com/frankra/frankenstein-ci.git@bec6acf564044d4da34a38ef45fbf83f95e9df9e",
       "supplier": "Organization: Chainguard, Inc.",
       "primaryPackagePurpose": "SOURCE",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a"
+          "checksumValue": "bec6acf564044d4da34a38ef45fbf83f95e9df9e"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:github/frankra/frankenstein-ci@4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
+          "referenceLocator": "pkg:github/frankra/frankenstein-ci@bec6acf564044d4da34a38ef45fbf83f95e9df9e",
           "referenceType": "purl"
         }
       ]
@@ -88,14 +88,14 @@
   ],
   "relationships": [
     {
-      "spdxElementId": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "spdxElementId": "SPDXRef-Package-sha256-b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
       "relationshipType": "VARIANT_OF",
-      "relatedSpdxElement": "SPDXRef-Package-sha256-4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd"
+      "relatedSpdxElement": "SPDXRef-Package-sha256-c242a3432ba5347ab99eb6fc75f19df14841c23fb441b5b089498fb11bf607a6"
     },
     {
-      "spdxElementId": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "spdxElementId": "SPDXRef-Package-sha256-b6e995453f4ea49c283100a293331f189506d7c1998ef552f3e50df190415852",
       "relationshipType": "GENERATED_FROM",
-      "relatedSpdxElement": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC644d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a"
+      "relatedSpdxElement": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC64bec6acf564044d4da34a38ef45fbf83f95e9df9e"
     }
   ]
 }
