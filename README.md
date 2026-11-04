@@ -149,14 +149,25 @@ frankenstein-ci/
 
 ---
 
-### Milestone 3: Declarative Image Building with Wolfi, `melange`, and `apko` (`experiments/runtime/`, `experiments/melange/`, `experiments/apko/`) — 🚧 In Progress
+### Milestone 3: Declarative Image Building with Wolfi, `melange`, and `apko` (`experiments/runtime/`, `experiments/melange/`, `experiments/apko/`) — ✅ Completed
 
 > Replace imperative, non-reproducible `Dockerfile` `RUN` layers with declarative package compilation (`melange`) and daemonless image assembly (`apko`).
 
-* **Workflow:**
-  1. `make build-apk`: Uses [`experiments/melange/melange.yaml`](./experiments/melange/melange.yaml) and `bubblewrap` to compile [`experiments/runtime/main.go`](./experiments/runtime/main.go) into a signed Wolfi `.apk` package (`frankenstein-runtime-0.1.0-r0.apk`).
-  2. `make build-image`: Uses [`experiments/apko/apko.yaml`](./experiments/apko/apko.yaml) to combine `wolfi-baselayout`, `ca-certificates-bundle`, `tzdata`, and `frankenstein-runtime` into a distroless OCI image tarball (`experiments/apko/image.tar`) running as `nonroot` (`UID 65532`), along with build-time SPDX SBOMs.
-  3. `make run-image`: Loads `image.tar` and runs the HTTP server on `http://localhost:8080`.
+* **How It Works End-to-End:**
+  1. **`make build-apk` (`melange`):** Spins up an isolated `bubblewrap` build environment with the Wolfi Go toolchain, compiles [`experiments/runtime/main.go`](./experiments/runtime/main.go) into a static binary, packages **only** `/usr/bin/frankenstein-runtime` into a Wolfi `.apk` (`frankenstein-runtime-0.1.0-r0.apk`), and cryptographically signs the package with `melange.rsa`.
+  2. **`make build-image` (`apko`):** Verifies the `.apk` signatures against `wolfi-signing.rsa.pub` and `melange.rsa.pub`, merges `wolfi-baselayout`, `ca-certificates-bundle`, `tzdata`, and `frankenstein-runtime` into a single flattened OCI layer (`3.39 MB` compressed / `13.6 MB` uncompressed), configures the unprivileged `nonroot` user (`UID 65532`), and emits build-time SPDX SBOMs (`sbom-x86_64.spdx.json`, `sbom-index.spdx.json`).
+  3. **`make run-image`:** Loads `experiments/apko/image.tar` and runs the distroless container on `http://localhost:8080`:
+     ```json
+     {
+       "message": "Hello from a distroless Wolfi container built with melange + apko!",
+       "os": "linux",
+       "arch": "amd64",
+       "uid": 65532,
+       "gid": 65532,
+       "pid": 1
+     }
+     ```
+  * **Security Verification:** Running `docker exec -it <container> /bin/sh` fails immediately (`stat /bin/sh: no such file or directory`), confirming the runtime container contains zero shells or package managers.
 
 ---
 
@@ -172,7 +183,7 @@ frankenstein-ci/
 
 ---
 
-### Milestone 5: Cryptographic Supply Chain Provenance (`experiments/cosign/`) — 📋 Planned
+### Milestone 5: Cryptographic Supply Chain Provenance (`experiments/cosign/`) — 🚧 Ready to Run (`make all`)
 
 > A container image is only trustworthy if its identity and build provenance are cryptographically verifiable.
 
