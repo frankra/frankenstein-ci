@@ -1,11 +1,11 @@
 {
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "sbom-sha256:f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
+  "name": "sbom-sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
   "spdxVersion": "SPDX-2.3",
   "creationInfo": {
-    "created": "2026-10-20T14:12:01Z",
+    "created": "2026-10-28T20:49:35Z",
     "creators": [
-      "Tool: apko (1.4.12)",
+      "Tool: apko (v1.4.15)",
       "Organization: Chainguard, Inc"
     ],
     "licenseListVersion": "3.27"
@@ -13,13 +13,13 @@
   "dataLicense": "CC0-1.0",
   "documentNamespace": "https://spdx.org/spdxdocs/apko/",
   "documentDescribes": [
-    "SPDXRef-Package-sha256-f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db"
+    "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9"
   ],
   "packages": [
     {
-      "SPDXID": "SPDXRef-Package-sha256-f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
-      "name": "sha256:f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
-      "versionInfo": "sha256:f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
+      "SPDXID": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "name": "sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "versionInfo": "sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
       "filesAnalyzed": false,
       "description": "Multi-arch image index",
       "downloadLocation": "NOASSERTION",
@@ -29,21 +29,21 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db"
+          "checksumValue": "8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/my-wolfi-python@sha256:f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db?mediaType=application%2Fvnd.oci.image.index.v1%2Bjson",
+          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9?mediaType=application%2Fvnd.oci.image.index.v1%2Bjson",
           "referenceType": "purl"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-sha256-7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b",
-      "name": "sha256:7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b",
-      "versionInfo": "sha256:7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b",
+      "SPDXID": "SPDXRef-Package-sha256-4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
+      "name": "sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
+      "versionInfo": "sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd",
       "filesAnalyzed": false,
       "downloadLocation": "NOASSERTION",
       "supplier": "Organization: Chainguard, Inc.",
@@ -51,35 +51,36 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b"
+          "checksumValue": "4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/my-wolfi-python@sha256:7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
+          "referenceLocator": "pkg:oci/frankenstein-runtime@sha256:4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
           "referenceType": "purl"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-sha256-0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c",
-      "name": "sha256:0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c",
-      "versionInfo": "sha256:0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c",
+      "SPDXID": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC644d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
+      "name": "github.com/frankra/frankenstein-ci.git",
+      "versionInfo": "4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
       "filesAnalyzed": false,
-      "downloadLocation": "NOASSERTION",
+      "description": "Image configuration source",
+      "downloadLocation": "git+ssh://github.com/frankra/frankenstein-ci.git@4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
       "supplier": "Organization: Chainguard, Inc.",
-      "primaryPackagePurpose": "CONTAINER",
+      "primaryPackagePurpose": "SOURCE",
       "checksums": [
         {
-          "algorithm": "SHA256",
-          "checksumValue": "0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c"
+          "algorithm": "SHA1",
+          "checksumValue": "4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/my-wolfi-python@sha256:0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c?arch=arm64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
+          "referenceLocator": "pkg:github/frankra/frankenstein-ci@4d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a",
           "referenceType": "purl"
         }
       ]
@@ -87,14 +88,14 @@
   ],
   "relationships": [
     {
-      "spdxElementId": "SPDXRef-Package-sha256-f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
+      "spdxElementId": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
       "relationshipType": "VARIANT_OF",
-      "relatedSpdxElement": "SPDXRef-Package-sha256-7105cb0d81e211d01842f1bc942fb8826dc64466cd5f5132de02d07ff0c1b53b"
+      "relatedSpdxElement": "SPDXRef-Package-sha256-4b2c7e5f4f37babafa502c28877acc2ceeac08447968d904ed3e7f00248a6bfd"
     },
     {
-      "spdxElementId": "SPDXRef-Package-sha256-f6765683dc982492440266db2ff49e6e6dde00e3ff750d56acac2e4d4d4042db",
-      "relationshipType": "VARIANT_OF",
-      "relatedSpdxElement": "SPDXRef-Package-sha256-0577238b325b256abd0f1106475d0db1a6af6afc538ab909f78de615a342019c"
+      "spdxElementId": "SPDXRef-Package-sha256-8beb2ab65573b223a1a3d0dd858395268af3e2e3d039a9daca76fe199666d1d9",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-Package-gitC43ssh-C47C47github.comC47frankraC47frankenstein-ci.gitC644d60fdaaded3fbfdc4ecad64a3fadd7ce66c269a"
     }
   ]
 }

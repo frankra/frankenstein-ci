@@ -34,11 +34,56 @@ flowchart LR
 
 ---
 
+## Prerequisites
+
+To run the experiments and build pipeline natively (Linux or WSL2 on Windows), install the following tools:
+
+| Tool | Role in `frankenstein-ci` | Documentation / Releases |
+| :--- | :--- | :--- |
+| **Go (1.22+)** | Compiles the OCI CLI (`cli/`), OCI Registry (`registry/`), and Linux container runtime (`experiments/`). | [go.dev/dl](https://go.dev/dl/) |
+| **`bubblewrap` (`bwrap`)** | Unprivileged Linux namespace sandbox used by `melange` as its default daemonless build runner. | [containers/bubblewrap](https://github.com/containers/bubblewrap) |
+| **`melange`** | Chainguard's declarative APK compiler—compiles source code into signed Wolfi `.apk` packages. | [chainguard-dev/melange](https://github.com/chainguard-dev/melange) |
+| **`apko`** | Chainguard's declarative OCI image assembler—builds distroless OCI images and SPDX SBOMs directly from `.apk` packages without Docker. | [chainguard-dev/apko](https://github.com/chainguard-dev/apko) |
+| **`cosign`** | Sigstore tool for cryptographic container signing, verification, and in-toto SBOM attestations. | [sigstore/cosign](https://docs.sigstore.dev/cosign/system_config/installation/) |
+| **Docker** *(Optional)* | Only used if you want to test loading the `apko` tarball via `docker load` (`make run-image`). Not required for building or publishing images. | [docs.docker.com](https://docs.docker.com/engine/install/) |
+
+### Installing on Ubuntu / Debian / WSL2
+
+1. **Install system packages (`bubblewrap` & `make`):**
+   ```bash
+   sudo apt-get update && sudo apt-get install -y bubblewrap make
+   ```
+2. **Install `melange`, `apko`, and `cosign` natively:**
+   * **Option A — Via Go (`go install`):**
+     ```bash
+     go install chainguard.dev/melange@latest
+     go install chainguard.dev/apko@latest
+     go install github.com/sigstore/cosign/v2/cmd/cosign@latest
+     # Ensure $(go env GOPATH)/bin is in your PATH
+     ```
+   * **Option B — Extract static binaries directly from Chainguard's distroless images (or GitHub Releases):**
+     ```bash
+     for tool in melange apko cosign; do
+       docker pull cgr.dev/chainguard/$tool:latest
+       cid=$(docker create cgr.dev/chainguard/$tool:latest)
+       sudo docker cp $cid:/usr/bin/$tool /usr/local/bin/$tool
+       docker rm $cid
+       sudo chmod +x /usr/local/bin/$tool
+     done
+     ```
+3. **Verify your local setup and generate signing keys:**
+   ```bash
+   make setup
+   ```
+
+---
+
 ## Repository Map
 
 ```text
 frankenstein-ci/
 ├── go.mod
+├── Makefile                 # End-to-end automation (setup, keys, melange, apko, cosign)
 ├── README.md
 │
 ├── cli/                     # Milestone 1: Pure-Go OCI Registry Client (Pull & Push)
@@ -58,6 +103,7 @@ frankenstein-ci/
 │   │   ├── apko.yaml
 │   │   └── sbom-*.spdx.json
 │   ├── melange/             # Milestone 3b: Compiling Go source into a signed Wolfi .apk package
+│   │   └── melange.yaml
 │   ├── cosign/              # Milestone 5: Cryptographic image signing & attestation verification
 │   └── images/              # Extracted root filesystems (e.g., cgr.dev/chainguard/static) for inspection
 │
@@ -107,11 +153,10 @@ frankenstein-ci/
 
 > Replace imperative, non-reproducible `Dockerfile` `RUN` layers with declarative package compilation (`melange`) and daemonless image assembly (`apko`).
 
-* **Progress & Goals:**
-  * [x] Assemble a multi-arch (`amd64`, `arm64`), non-root (`UID 65532`) Wolfi image using [`experiments/apko/apko.yaml`](./experiments/apko/apko.yaml) and generate build-time SPDX SBOMs (`sbom-x86_64.spdx.json`, `sbom-aarch64.spdx.json`, `sbom-index.spdx.json`).
-  * [x] Write a minimal Go HTTP server ([`experiments/runtime/main.go`](./experiments/runtime/main.go)) that reports its runtime OS, architecture, UID/GID, and PID.
-  * [ ] Package the Go HTTP server into a signed Wolfi `.apk` using `melange.yaml` in `experiments/melange/`.
-  * [ ] Compose the custom `.apk` with `wolfi-baselayout` and `ca-certificates-bundle` via `apko build` into a zero-CVE distroless OCI image tarball.
+* **Workflow:**
+  1. `make build-apk`: Uses [`experiments/melange/melange.yaml`](./experiments/melange/melange.yaml) and `bubblewrap` to compile [`experiments/runtime/main.go`](./experiments/runtime/main.go) into a signed Wolfi `.apk` package (`frankenstein-runtime-0.1.0-r0.apk`).
+  2. `make build-image`: Uses [`experiments/apko/apko.yaml`](./experiments/apko/apko.yaml) to combine `wolfi-baselayout`, `ca-certificates-bundle`, `tzdata`, and `frankenstein-runtime` into a distroless OCI image tarball (`experiments/apko/image.tar`) running as `nonroot` (`UID 65532`), along with build-time SPDX SBOMs.
+  3. `make run-image`: Loads `image.tar` and runs the HTTP server on `http://localhost:8080`.
 
 ---
 
@@ -131,7 +176,7 @@ frankenstein-ci/
 
 > A container image is only trustworthy if its identity and build provenance are cryptographically verifiable.
 
-* **Goals:**
-  1. Push the `apko`-built image to our local OCI registry (`registry/`).
-  2. Sign the image digest and attach the `apko`-generated SPDX SBOM as an in-toto attestation using Sigstore's `cosign`.
-  3. Verify the signature and attestation (`cosign verify` / `cosign verify-attestation`), and inspect how the `.sig` / OCI Referrers manifest is stored inside the registry's content-addressable store.
+* **Workflow:**
+  1. `make publish-image`: Uses `apko publish` to push the image directly to an OCI registry without Docker and records its immutable `@sha256:...` digest.
+  2. `make sign` & `make verify`: Signs the image digest with `cosign` and verifies the cryptographic signature.
+  3. `make attest` & `make verify-attestation`: Attaches the `apko`-generated SPDX SBOM (`sbom-index.spdx.json`) as a signed in-toto attestation on the image and verifies it.

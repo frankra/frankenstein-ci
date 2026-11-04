@@ -41,3 +41,4 @@ experiments/cosign/published-image.ref
 *.tar
 *.apk
 cosign.key
+melange.rsa.pub
